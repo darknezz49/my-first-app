@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
@@ -16,12 +17,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 import java.util.UUID
 
 // ==========================================
@@ -77,11 +85,6 @@ enum class SortType(val title: String) {
 // 3. 界面与主逻辑区
 // ==========================================
 
-sealed class Screen {
-    object Home : Screen()
-    data class AddEdit(val itemToEdit: GuiWuItem? = null) : Screen()
-}
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -119,28 +122,47 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GuiWuBenApp(dao: GuiWuDao) {
     val items by remember { dao.getAllItems() }.collectAsState(initial = emptyList())
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
+    val navController = rememberNavController()
     val coroutineScope = rememberCoroutineScope()
 
-    when (val screen = currentScreen) {
-        is Screen.Home -> {
+    NavHost(navController = navController, startDestination = "home") {
+        composable("home") {
             HomeScreen(
                 items = items,
-                onNavigateToAdd = { currentScreen = Screen.AddEdit() },
-                onNavigateToEdit = { item -> currentScreen = Screen.AddEdit(item) },
+                onNavigateToAdd = { navController.navigate("add_item") },
+                onNavigateToEdit = { item -> navController.navigate("add_item/${item.id}") },
                 onDelete = { item ->
                     coroutineScope.launch { dao.deleteItem(item) }
                 }
             )
         }
-        is Screen.AddEdit -> {
+        composable(
+            route = "add_item/{itemId}",
+            arguments = listOf(navArgument("itemId") {
+                type = NavType.StringType
+            })
+        ) { backStackEntry ->
+            val itemId = backStackEntry.arguments?.getString("itemId")
+            val itemToEdit = items.find { it.id == itemId }
             AddEditScreen(
-                itemToEdit = screen.itemToEdit,
+                navController = navController,
+                itemToEdit = itemToEdit,
                 onSave = { newItem ->
                     coroutineScope.launch { dao.insertItem(newItem) }
-                    currentScreen = Screen.Home
+                    navController.popBackStack()
                 },
-                onCancel = { currentScreen = Screen.Home }
+                onCancel = { navController.popBackStack() }
+            )
+        }
+        composable("add_item") {
+            AddEditScreen(
+                navController = navController,
+                itemToEdit = null,
+                onSave = { newItem ->
+                    coroutineScope.launch { dao.insertItem(newItem) }
+                    navController.popBackStack()
+                },
+                onCancel = { navController.popBackStack() }
             )
         }
     }
@@ -222,9 +244,9 @@ fun HomeScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("当前总资产", style = MaterialTheme.typography.labelLarge)
-                        Text("¥ ${String.format("%.2f", totalAssets)}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                        Text("¥ ${String.format(Locale.getDefault(), "%.2f", totalAssets)}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("整体日均成本：${String.format("%.2f", totalDailyCost)} 元/天", style = MaterialTheme.typography.bodyMedium)
+                        Text("整体日均成本：${String.format(Locale.getDefault(), "%.2f", totalDailyCost)} 元/天", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -266,7 +288,7 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("购买日期: ${item.date}")
                                 Text("已陪伴: $daysOwned 天")
-                                Text("购入价格: ${item.price} 元 (日均: ${String.format("%.2f", dailyCost)} 元/天)")
+                                 Text("购入价格: ${item.price} 元 (日均: ${String.format(Locale.getDefault(), "%.2f", dailyCost)} 元/天)")
                             }
                         }
                     }
@@ -296,8 +318,10 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditScreen(
+    navController: NavHostController,
     itemToEdit: GuiWuItem?,
     onSave: (GuiWuItem) -> Unit,
     onCancel: () -> Unit
@@ -307,63 +331,76 @@ fun AddEditScreen(
     var selectedDate by remember { mutableStateOf(itemToEdit?.date ?: LocalDate.now()) }
     var errorMessage by remember { mutableStateOf("") }
 
-    Column(modifier = Modifier.padding(24.dp).fillMaxSize()) {
-        Text(if (itemToEdit == null) "添加新物品" else "修改物品", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(24.dp))
-
-        OutlinedTextField(
-            value = name,
-            onValueChange = { name = it },
-            label = { Text("物品名称") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = price,
-            onValueChange = { price = it },
-            label = { Text("购入价格 (元)") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text("购买日期", style = MaterialTheme.typography.bodyMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        DateDropdowns(
-            selectedDate = selectedDate,
-            onDateChange = { selectedDate = it }
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (errorMessage.isNotEmpty()) {
-            Text(errorMessage, color = MaterialTheme.colorScheme.error)
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
-                Text("取消")
-            }
-            Button(
-                onClick = {
-                    val parsedPrice = price.toDoubleOrNull()
-                    if (name.isBlank() || parsedPrice == null) {
-                        errorMessage = "请填写正确的名称和数字格式的价格！"
-                    } else {
-                        val newItem = GuiWuItem(
-                            id = itemToEdit?.id ?: UUID.randomUUID().toString(),
-                            name = name,
-                            price = parsedPrice,
-                            date = selectedDate
-                        )
-                        onSave(newItem)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(if (itemToEdit == null) "添加新物品" else "修改物品") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
-                },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("保存")
+                }
+            )
+        }
+    ) { paddingValues ->
+        Column(modifier = Modifier.padding(paddingValues).padding(24.dp).fillMaxSize()) {
+            Text(if (itemToEdit == null) "添加新物品" else "修改物品", style = MaterialTheme.typography.headlineMedium)
+            Spacer(modifier = Modifier.height(24.dp))
+
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("物品名称") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = price,
+                onValueChange = { price = it },
+                label = { Text("购入价格 (元)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text("购买日期", style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            DateDropdowns(
+                selectedDate = selectedDate,
+                onDateChange = { selectedDate = it }
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (errorMessage.isNotEmpty()) {
+                Text(errorMessage, color = MaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
+                    Text("取消")
+                }
+                Button(
+                    onClick = {
+                        val parsedPrice = price.toDoubleOrNull()
+                        if (name.isBlank() || parsedPrice == null) {
+                            errorMessage = "请填写正确的名称和数字格式的价格！"
+                        } else {
+                            val newItem = GuiWuItem(
+                                id = itemToEdit?.id ?: UUID.randomUUID().toString(),
+                                name = name,
+                                price = parsedPrice,
+                                date = selectedDate
+                            )
+                            onSave(newItem)
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("保存")
+                }
             }
         }
     }
