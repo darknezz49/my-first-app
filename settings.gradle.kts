@@ -3,7 +3,7 @@ pluginManagement {
         // 阿里云全套镜像（包括公共库、Google库和Gradle插件库）
         maven { url = uri("https://maven.aliyun.com/repository/google") }
         maven { url = uri("https://maven.aliyun.com/repository/public") }
-        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") } // <-- 就是加了这行解决你的问题
+        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
 
         google {
             content {
