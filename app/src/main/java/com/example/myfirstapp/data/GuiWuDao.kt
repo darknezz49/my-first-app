@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface GuiWuDao {
-    @Query("SELECT * FROM guiwu_items ORDER BY date DESC")
+    @Query("SELECT * FROM guiwu_items ORDER BY createdAt DESC")
     fun getAllItems(): Flow<List<GuiWuItem>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

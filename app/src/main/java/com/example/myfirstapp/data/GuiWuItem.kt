@@ -10,5 +10,6 @@ data class GuiWuItem(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val name: String,
     val price: Double,
-    val date: LocalDate
+    val date: LocalDate,
+    val createdAt: Long = System.currentTimeMillis()
 )

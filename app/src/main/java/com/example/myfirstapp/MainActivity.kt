@@ -12,6 +12,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.room.Room
 import com.example.myfirstapp.data.AppDatabase
+import com.example.myfirstapp.data.MIGRATION_1_2
 import com.example.myfirstapp.navigation.GuiWuBenApp
 
 class MainActivity : ComponentActivity() {
@@ -21,7 +22,8 @@ class MainActivity : ComponentActivity() {
         val db = Room.databaseBuilder(
             applicationContext,
             AppDatabase::class.java, "guiwu-database"
-        ).build()
+        ).addMigrations(MIGRATION_1_2)
+            .build()
         val dao = db.guiwuDao()
 
         setContent {

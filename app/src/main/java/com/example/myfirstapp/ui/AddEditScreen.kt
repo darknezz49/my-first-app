@@ -106,7 +106,8 @@ fun AddEditScreen(
                                 id = itemToEdit?.id ?: UUID.randomUUID().toString(),
                                 name = name,
                                 price = parsedPrice,
-                                date = selectedDate
+                                date = selectedDate,
+                                createdAt = itemToEdit?.createdAt ?: System.currentTimeMillis()
                             )
                             onSave(newItem)
                         }

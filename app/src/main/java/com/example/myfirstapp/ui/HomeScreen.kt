@@ -131,7 +131,7 @@ fun HomeScreen(
 
             val sortedItems = remember(items, sortType) {
                 when (sortType) {
-                    SortType.DEFAULT -> items
+                    SortType.DEFAULT -> items.sortedByDescending { it.createdAt }
                     SortType.PRICE_ASC -> items.sortedBy { it.price }
                     SortType.PRICE_DESC -> items.sortedByDescending { it.price }
                     SortType.TIME_ASC -> items.sortedByDescending { it.date }
